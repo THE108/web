@@ -2,6 +2,7 @@ package web
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,6 +22,8 @@ type ResponseWriter interface {
 	Written() bool
 	// Size returns the size in bytes of the body written so far.
 	Size() int
+	// Write json data
+	WriteJson(data interface{}, statusCode int)
 }
 
 type appResponseWriter struct {
@@ -73,4 +76,17 @@ func (w *appResponseWriter) Flush() {
 	if ok {
 		flusher.Flush()
 	}
+}
+
+func (w *appResponseWriter) WriteJson(data interface{}, statusCode int) (n int, err error) {
+
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return 0, err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	return w.Write(dataBytes)
 }
