@@ -1,6 +1,8 @@
 package web
 
 import (
+	"encoding/json"
+	"ioutil"
 	"net/http"
 	"reflect"
 )
@@ -33,4 +35,18 @@ func (r *Request) RoutePath() string {
 		return r.route.Path
 	}
 	return ""
+}
+
+func (r *Request) UnmarshalJson(data interface{}) error {
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(body, data); err != nil {
+		return err
+	}
+
+	return nil
 }
