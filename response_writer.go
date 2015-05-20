@@ -23,7 +23,7 @@ type ResponseWriter interface {
 	// Size returns the size in bytes of the body written so far.
 	Size() int
 	// Write json data
-	WriteJson(data interface{}, statusCode int)
+	WriteJson(data interface{}, statusCode int) (n int, err error)
 }
 
 type appResponseWriter struct {
