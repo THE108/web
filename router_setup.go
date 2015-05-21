@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -8,13 +9,13 @@ import (
 type httpMethod string
 
 const (
-	httpMethodGet    = httpMethod("GET")
-	httpMethodPost   = httpMethod("POST")
-	httpMethodPut    = httpMethod("PUT")
-	httpMethodDelete = httpMethod("DELETE")
-	httpMethodPatch  = httpMethod("PATCH")
-	httpMethodHead   = httpMethod("HEAD")
-	httpMethodOptions   = httpMethod("OPTIONS")
+	httpMethodGet     = httpMethod("GET")
+	httpMethodPost    = httpMethod("POST")
+	httpMethodPut     = httpMethod("PUT")
+	httpMethodDelete  = httpMethod("DELETE")
+	httpMethodPatch   = httpMethod("PATCH")
+	httpMethodHead    = httpMethod("HEAD")
+	httpMethodOptions = httpMethod("OPTIONS")
 )
 
 var httpMethods = []httpMethod{httpMethodGet, httpMethodPost, httpMethodPut, httpMethodDelete, httpMethodPatch, httpMethodHead, httpMethodOptions}
@@ -261,24 +262,33 @@ func validateContext(ctx interface{}, parentCtxType reflect.Type) {
 func validateHandler(vfn reflect.Value, ctxType reflect.Type) {
 	var req *Request
 	var resp func() ResponseWriter
-	if !isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req)) {
-		panic(instructiveMessage(vfn, "a handler", "handler", "rw web.ResponseWriter, req *web.Request", ctxType))
+
+	err := isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req))
+	if err != nil {
+		panic(instructiveMessage(vfn, "a handler", "handler",
+			"rw web.ResponseWriter, req *web.Request", ctxType, err))
 	}
 }
 
 func validateErrorHandler(vfn reflect.Value, ctxType reflect.Type) {
 	var req *Request
 	var resp func() ResponseWriter
-	if !isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req), emptyInterfaceType) {
-		panic(instructiveMessage(vfn, "an error handler", "error handler", "rw web.ResponseWriter, req *web.Request, err interface{}", ctxType))
+
+	err := isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req), emptyInterfaceType)
+	if err != nil {
+		panic(instructiveMessage(vfn, "an error handler", "error handler",
+			"rw web.ResponseWriter, req *web.Request, err interface{}", ctxType, err))
 	}
 }
 
 func validateNotFoundHandler(vfn reflect.Value, ctxType reflect.Type) {
 	var req *Request
 	var resp func() ResponseWriter
-	if !isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req)) {
-		panic(instructiveMessage(vfn, "a 'not found' handler", "not found handler", "rw web.ResponseWriter, req *web.Request", ctxType))
+
+	err := isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req))
+	if err != nil {
+		panic(instructiveMessage(vfn, "a 'not found' handler", "not found handler",
+			"rw web.ResponseWriter, req *web.Request", ctxType, err))
 	}
 }
 
@@ -286,18 +296,21 @@ func validateMiddleware(vfn reflect.Value, ctxType reflect.Type) {
 	var req *Request
 	var resp func() ResponseWriter
 	var n NextMiddlewareFunc
-	if !isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req), reflect.TypeOf(n)) {
-		panic(instructiveMessage(vfn, "middleware", "middleware", "rw web.ResponseWriter, req *web.Request, next web.NextMiddlewareFunc", ctxType))
+
+	err := isValidHandler(vfn, ctxType, reflect.TypeOf(resp).Out(0), reflect.TypeOf(req), reflect.TypeOf(n))
+	if err != nil {
+		panic(instructiveMessage(vfn, "middleware", "middleware",
+			"rw web.ResponseWriter, req *web.Request, next web.NextMiddlewareFunc", ctxType, err))
 	}
 }
 
 // Ensures vfn is a function, that optionally takes a *ctxType as the first argument, followed by the specified types. Handlers have no return value.
 // Returns true if valid, false otherwise.
-func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Type) bool {
+func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Type) error {
 	fnType := vfn.Type()
 
 	if fnType.Kind() != reflect.Func {
-		return false
+		return fmt.Errorf("Handler is not a function, it is %v", fnType.Kind())
 	}
 
 	typesStartIdx := 0
@@ -306,7 +319,7 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 	numOut := fnType.NumOut()
 
 	if numOut != 0 {
-		return false
+		return fmt.Errorf("Return values count must be 0 not %d", numOut)
 	}
 
 	if numIn == typesLen {
@@ -314,22 +327,23 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 	} else if numIn == (typesLen + 1) {
 		// context, types
 		firstArgType := fnType.In(0)
-		if firstArgType != reflect.PtrTo(ctxType) && firstArgType != emptyInterfaceType {
-			return false
+		ptr := reflect.PtrTo(ctxType)
+		if firstArgType != ptr && firstArgType != emptyInterfaceType {
+			return fmt.Errorf("First arg isn't %v and isn't empty interface", ptr)
 		}
 		typesStartIdx = 1
 	} else {
-		return false
+		return fmt.Errorf("Too many input params - %d", numIn)
 	}
 
 	for _, typeArg := range types {
 		if fnType.In(typesStartIdx) != typeArg {
-			return false
+			return fmt.Errorf("Type %v isn't %v", fnType.In(typesStartIdx) != typeArg)
 		}
 		typesStartIdx++
 	}
 
-	return true
+	return nil
 }
 
 // Since it's easy to pass the wrong method to a middleware/handler route, and since the user can't rely on static type checking since we use reflection,
@@ -340,7 +354,7 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 //  - yourType is for "Your {yourType} function can have...". Eg, "middleware" or "handler" or "error handler"
 //  - args is like "rw web.ResponseWriter, req *web.Request, next web.NextMiddlewareFunc"
 //    - NOTE: args can be calculated if you pass in each type. BUT, it doesn't have example argument name, so it has less copy/paste value.
-func instructiveMessage(vfn reflect.Value, addingType string, yourType string, args string, ctxType reflect.Type) string {
+func instructiveMessage(vfn reflect.Value, addingType string, yourType string, args string, ctxType reflect.Type, err error) string {
 	// Get context type without package.
 	ctxString := ctxType.String()
 	splitted := strings.Split(ctxString, ".")
@@ -363,6 +377,8 @@ func instructiveMessage(vfn reflect.Value, addingType string, yourType string, a
 	str += "* func YourFunctionName(c *" + ctxString + ", " + args + ")\n"
 	str += "*\n"
 	str += "* Unfortunately, your function has this signature: " + vfn.Type().String() + "\n"
+	str += "*\n"
+	str += "* Error: " + err.Error()
 	str += "*\n"
 	str += strings.Repeat("*", 120) + "\n"
 
