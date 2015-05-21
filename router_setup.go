@@ -338,7 +338,7 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 
 	for _, typeArg := range types {
 		if fnType.In(typesStartIdx) != typeArg {
-			return fmt.Errorf("Type %v isn't %v", fnType.In(typesStartIdx) != typeArg)
+			return fmt.Errorf("Type %v isn't %v", fnType.In(typesStartIdx), typeArg)
 		}
 		typesStartIdx++
 	}
