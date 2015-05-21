@@ -310,7 +310,7 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 	fnType := vfn.Type()
 
 	if fnType.Kind() != reflect.Func {
-		return fmt.Errorf("Handler is not a function, it is %v", fnType.Kind())
+		return fmt.Errorf("Handler is not a function, it is '%v'", fnType.Kind())
 	}
 
 	typesStartIdx := 0
@@ -329,7 +329,7 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 		firstArgType := fnType.In(0)
 		ptr := reflect.PtrTo(ctxType)
 		if firstArgType != ptr && firstArgType != emptyInterfaceType {
-			return fmt.Errorf("First arg isn't %v and isn't empty interface", ptr)
+			return fmt.Errorf("First arg isn't '%v' and isn't empty interface", ptr)
 		}
 		typesStartIdx = 1
 	} else {
@@ -338,7 +338,7 @@ func isValidHandler(vfn reflect.Value, ctxType reflect.Type, types ...reflect.Ty
 
 	for _, typeArg := range types {
 		if fnType.In(typesStartIdx) != typeArg {
-			return fmt.Errorf("Type %v isn't %v", fnType.In(typesStartIdx), typeArg)
+			return fmt.Errorf("Type '%v' isn't '%v'", fnType.In(typesStartIdx), typeArg)
 		}
 		typesStartIdx++
 	}
