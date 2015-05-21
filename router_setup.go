@@ -378,7 +378,7 @@ func instructiveMessage(vfn reflect.Value, addingType string, yourType string, a
 	str += "*\n"
 	str += "* Unfortunately, your function has this signature: " + vfn.Type().String() + "\n"
 	str += "*\n"
-	str += "* Error: " + err.Error()
+	str += "* Error: " + err.Error() + "\n"
 	str += "*\n"
 	str += strings.Repeat("*", 120) + "\n"
 
